@@ -10,19 +10,27 @@ package cs377w.audiosource;
 public final class R {
     public static final class attr {
     }
+    public static final class dimen {
+        /**  The standard margin used on the top, left, and right sides of a card. 
+         */
+        public static final int card_margin=0x7f050000;
+        /**  The distance between the bottom of a card and the bottom of a tips-view, adjusted so
+         that the baseline of the text is 40px from the bottom of the card. 
+         */
+        public static final int tip_margin_bottom=0x7f050001;
+    }
     public static final class drawable {
         public static final int ic_launcher=0x7f020000;
     }
     public static final class id {
-        public static final int start_button=0x7f060001;
-        public static final int stop_button=0x7f060002;
-        public static final int textView1=0x7f060000;
+        public static final int content=0x7f080000;
     }
     public static final class layout {
         public static final int activity_main=0x7f030000;
     }
     public static final class string {
-        public static final int app_name=0x7f040000;
+        public static final int app_name=0x7f060000;
+        public static final int glass_recognize_trigger=0x7f060001;
     }
     public static final class style {
         /** 
@@ -46,10 +54,13 @@ public final class R {
     
  API 14 theme customizations can go here. 
          */
-        public static final int AppBaseTheme=0x7f050000;
+        public static final int AppBaseTheme=0x7f070000;
         /**  Application theme. 
  All customizations that are NOT specific to a particular API-level can go here. 
          */
-        public static final int AppTheme=0x7f050001;
+        public static final int AppTheme=0x7f070001;
+    }
+    public static final class xml {
+        public static final int voice_trigger_recognize=0x7f040000;
     }
 }

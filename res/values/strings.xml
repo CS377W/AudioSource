@@ -1,5 +1,6 @@
 <resources>
 
     <string name="app_name">AudioSource</string>
+    <string name="glass_recognize_trigger">Recognize This</string>
 
 </resources>

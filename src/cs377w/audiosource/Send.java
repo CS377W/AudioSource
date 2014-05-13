@@ -1,121 +1,114 @@
 package cs377w.audiosource;
 
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-
+import com.google.android.glass.touchpad.Gesture;
+import com.google.android.glass.touchpad.GestureDetector;
+import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.media.AudioFormat;
-import android.media.AudioRecord;
-import android.media.MediaRecorder;
+import android.content.Context;
 import android.os.Bundle;
-import android.util.Log;
-import android.view.View;
-import android.view.View.OnClickListener;
-import android.widget.Button;
+import android.os.Handler;
+import android.os.Message;
+import android.view.MotionEvent;
+import android.widget.TextView;
 
 public class Send extends Activity {
-	private Button startButton, stopButton;
-
-	public byte[] buffer;
-	public static DatagramSocket socket;
-	private int port = 50005;
-	AudioRecord recorder;
-
-	private int sampleRate = 44100;
-	private int channelConfig = AudioFormat.CHANNEL_IN_MONO;
-	private int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
-	int minBufSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig,
-			audioFormat);
-	private boolean status = true;
+	private TextView tv;
+	private GestureDetector mGestureDetector;
+	private Recorder recorder;
+	private Thread recorderThread;
+    public RecognitionResult recognitionResult = null;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+		tv = (TextView) findViewById(R.id.content);
+		mGestureDetector = createGestureDetector(this);
+	}
+	
+    @SuppressLint("HandlerLeak") public Handler recognitionResultHandler = new Handler() {
+    	public void handleMessage(Message msg) {
+    		if (recognitionResult == null) return;
+    		tv.setText(recognitionResult.toString());
+    		recorder = null;
+    		recorderThread = null;
+    	}
+    };
 
-		startButton = (Button) findViewById(R.id.start_button);
-		stopButton = (Button) findViewById(R.id.stop_button);
 
-		startButton.setOnClickListener(startListener);
-		stopButton.setOnClickListener(stopListener);
-
-//		minBufSize += 2048;
-		System.out.println("minBufSize: " + minBufSize);
+	private GestureDetector createGestureDetector(Context context) {
+		GestureDetector gestureDetector = new GestureDetector(context);
+		// Create a base listener for generic gestures
+		gestureDetector.setBaseListener(new GestureDetector.BaseListener() {
+			@Override
+			public boolean onGesture(Gesture gesture) {
+				if (gesture == Gesture.TAP) {
+					if (recorder == null) {
+						recorder = new Recorder();
+						// TODO: think of a more elegant way to pass these along
+						recognitionResult = new RecognitionResult();
+						recorder.recognitionResult = recognitionResult;
+						recorder.handler = recognitionResultHandler;
+						recorderThread = new Thread(recorder);
+					}
+					
+					if(!recorder.getIsRunning()) {
+						tv.setText("Streaming...");
+						recorderThread.start();
+					} else {
+						recorder.cancel();
+						recorder = null;
+						recorderThread = null;
+						tv.setText("Stopped Streaming");
+					}
+					return true;
+				} else if (gesture == Gesture.TWO_TAP) {
+					// do something on two finger tap
+					return true;
+				} else if (gesture == Gesture.SWIPE_RIGHT) {
+					// do something on right (forward) swipe
+					return true;
+				} else if (gesture == Gesture.SWIPE_LEFT) {
+					// do something on left (backwards) swipe
+					return true;
+				}
+				return false;
+			}
+		});
+		gestureDetector.setFingerListener(new GestureDetector.FingerListener() {
+			@Override
+			public void onFingerCountChanged(int previousCount, int currentCount) {
+				// do something on finger count changes
+			}
+		});
+		gestureDetector.setScrollListener(new GestureDetector.ScrollListener() {
+			@Override
+			public boolean onScroll(float displacement, float delta,
+					float velocity) {
+				// do something on scrolling
+				return true;
+			}
+		});
+		return gestureDetector;
 	}
 
-	private final OnClickListener stopListener = new OnClickListener() {
-
-		@Override
-		public void onClick(View arg0) {
-			status = false;
-			recorder.release();
-			Log.d("VS", "Recorder released");
+	/*
+	 * Send generic motion events to the gesture detector
+	 */
+	@Override
+	public boolean onGenericMotionEvent(MotionEvent event) {
+		if (mGestureDetector != null) {
+			return mGestureDetector.onMotionEvent(event);
 		}
-
-	};
-
-	private final OnClickListener startListener = new OnClickListener() {
-
-		@Override
-		public void onClick(View arg0) {
-			status = true;
-			startStreaming();
-		}
-
-	};
-
-	public void startStreaming() {
-
-		Thread streamThread = new Thread(new Runnable() {
-
-			@Override
-			public void run() {
-				try {
-
-					final InetAddress destination = InetAddress
-							.getByName("128.12.142.78");
-					Log.d("VS", "Address retrieved");
-
-					DatagramSocket socket = new DatagramSocket();
-					Log.d("VS", "Socket Created");
-
-					byte[] buffer = new byte[minBufSize];
-
-					Log.d("VS", "Buffer created of size " + minBufSize);
-					DatagramPacket packet;
-
-					recorder = new AudioRecord(MediaRecorder.AudioSource.MIC,
-							sampleRate, channelConfig, audioFormat, minBufSize);
-					Log.d("VS", "Recorder initialized");
-
-					recorder.startRecording();
-
-					while (status == true) {
-
-						// reading data from MIC into buffer
-						minBufSize = recorder.read(buffer, 0, buffer.length);
-
-						// putting buffer in the packet
-						packet = new DatagramPacket(buffer, buffer.length,
-								destination, port);
-
-						socket.send(packet);
-						System.out.println("MinBufferSize: " + minBufSize);
-
-					}
-
-				} catch (UnknownHostException e) {
-					Log.e("VS", "UnknownHostException");
-				} catch (IOException e) {
-					e.printStackTrace();
-					Log.e("VS", "IOException");
-				}
-			}
-
-		});
-		streamThread.start();
+		return false;
+	}
+	
+	@Override
+	public void onDestroy() { 
+	    super.onDestroy();
+	    if (recorder != null) {
+	    	recorder.cancel();
+	    	recorder = null;
+	    }
 	}
 }
